@@ -1,176 +1,351 @@
-import math
-from scipy.stats import f, t
-from functools import partial
-from random import randint
 import numpy as np
-from prettytable import PrettyTable
-from numpy.linalg import solve
-
-def cochrane(g_prac, g_teor):
-    return g_prac < g_teor
-
-def student(t_teor, t_pr):
-    return t_pr < t_teor
-
-def fisher(f_teor, f_prac):
-    return f_teor > f_prac
-
-def cochrane_teor(f1, f2, q=0.05):
-    q1 = q / f1
-    fisher_value = f.ppf(q=1 - q1, dfn=f2, dfd=(f1 - 1) * f2)
-    return fisher_value / (fisher_value + f1 - 1)
-
-def cohrane_t(f1, f2, q = 0.05):
-	q1 = q / f1
-
-fisher_t = partial(f.ppf, q=1 - 0.05)
-student_t = partial(t.ppf, q=1 - 0.025)
-
-n = 8
-m = 3
-
-x1min = -20
-x1max = 15
-x2min = -15
-x2max = 35
-x3min = -15
-x3max = -10
-
-xmin = (x1min + x2min + x3min)/3
-xmax = (x1max + x2max + x3max)/3
-
-ymin = round(200 + xmin)
-ymax = round(200 + xmax)
-
-while True:
-	x0f = [1, 1, 1, 1, 1, 1, 1, 1]
-	x1f = [-1, -1, -1, -1, 1, 1, 1, 1]
-	x2f = [-1, -1, 1, 1, -1, -1, 1, 1]
-	x3f = [-1, 1, -1, 1, -1, 1, -1, 1]
-	x12f = [i*j for i, j in zip(x1f, x2f)]
-	x13f = [i*j for i, j in zip(x1f, x3f)]
-	x23f = [i*j for i, j in zip(x2f, x3f)]
-	x123f = [i*j*k for i, j, k in zip(x1f, x2f, x3f)]
-	list_fact = [x0f, x1f, x2f, x3f, x12f, x13f, x23f, x123f]
-	y1 = [randint(ymin, ymax) for i in range(n)]
-	y2 = [randint(ymin, ymax) for i in range(n)]
-	y3 = [randint(ymin, ymax) for i in range(n)]
-
-	y_rows = {}
-	for i in range(1, 9):
-		y_rows["Рядок{0}".format(i)] = [y1[i-1], y2[i-1], y3[i-1]]
-
-	y_row_ser = {}
-	for i in range(1, 9):
-		y_row_ser["Середнє значення Y у рядку{0}".format(i)] = np.average(y_rows[f"Рядок{i}"])
-	y_ser = [round(val, 3) for val in y_row_ser.values()]
-
-	x0 = [1, 1, 1, 1, 1, 1, 1, 1]
-	x1 = [x1min, x1min, x1max, x1max, x1min, x1min, x1max, x1max]
-	x2 = [x2min, x2max, x2min, x2max, x2min, x2max, x2min, x2max]
-	x3 = [x3min, x3max, x3max, x3min, x3max, x3min, x3min, x3max]
-	x1x2 = [a * b for a, b in zip(x1, x2)]
-	x1x3 = [a * b for a, b in zip(x1, x3)]
-	x2x3 = [a * b for a, b in zip(x2, x3)]
-	x1x2x3 = [a * b * c for a, b, c in zip(x1, x2, x3)]
-	x_arr = [x0, x1, x2, x3, x1x2, x1x3, x2x3, x1x2x3]
-	list_x = list(zip(x0, x1, x2, x3, x1x2, x1x3, x2x3, x1x2x3))
-
-	list_bi = []
-	for k in range(n):
-		S = 0
-		for i in range(n):
-			S += (list_fact[k][i] * y_ser[i]) / n
-		list_bi.append(round(S, 5))
-
-	disp = {}
-	for i in range(1, 9):
-		disp["Дисперсія{0}".format(i)] = 0
-	for i in range(m):
-		ctr = 1
-		for key, value in disp.items():
-			row = y_rows[f'Рядок{ctr}']
-			disp[key] += ((row[i] - np.average(row)) ** 2) / m
-			ctr += 1
-	disp_sum = sum(disp.values())
-	disp_list = [round(disp, 3) for disp in disp.values()]
-	column = ["x0", "x1", "x2", "x3", "x1x2", "x1x3", "x2x3", "x1x2x3", "y1", "y2", "y3", "y", "s^2"]
-	pt = PrettyTable()
-	list_fact.extend([y1, y2, y3, y_ser, disp_list])
-
-	for k in range(len(list_fact)):
-		pt.add_column(column[k], list_fact[k])
-
-	print(pt, "\n")
-	# Regression eq with interaction effect
-	print("y = {} + {}*x1 + {}*x2 + {}*x3 + {}*x1x2 + {}*x1x3 + {}*x2x3 + {}*x1x2x3 \n".format(list_bi[0], list_bi[1],
-																							   list_bi[2], list_bi[3],
-																							   list_bi[4], list_bi[5],
-																							   list_bi[6], list_bi[7]))
-
-	pt = PrettyTable()
-	x_arr.extend([y1, y2, y3, y_ser, disp_list])
-	for k in range(len(list_fact)):
-		pt.add_column(column[k], list_fact[k])
-	print(pt, "\n")
-
-	list_ai = [round(i, 5) for i in solve(list_x, y_ser)]
-	print("y = {} + {}*x1 + {}*x2 + {}*x3 + {}*x1x2 + {}*x1x3 + {}*x2x3 + {}*x1x2x3".format(list_ai[0], list_ai[1],
-																							list_ai[2], list_ai[3],
-																							list_ai[4], list_ai[5],
-																							list_ai[6], list_ai[7]))
+from tabulate import tabulate
+from scipy.stats import f, t, ttest_ind, norm
+from _pydecimal import Decimal, ROUND_UP, ROUND_FLOOR
+import copy
 
 
-	gp = max(disp.values()) / disp_sum
-	f1 = m -1
-	f2 = n
-	gt = cochrane_teor(f1, f2)
+class Experiment():
+    def __init__(self, m, N, q):
+        self.m = m
+        self.N = N
+        self.q = q
+        self.d = 0
+        self.x = np.array([[-30, 0], [-35, 10], [0, 20]])
+        self.x_min_avg = self.x[:, 0].mean()
+        self.x_max_avg = self.x[:, 1].mean()
+        self.y_max = 200 + self.x_max_avg
+        self.y_min = 200 + self.x_min_avg
 
-	if cochrane(gp, gt):
-		print("Дисперсія є однорідною\n")
+    def gen_mat(self):
+        self.factors = []
+        for i in range(2 ** self.x.shape[0]):
+            self.factors.append(list(map(int, f'{i:0{self.x.shape[0]}b}')))
+        rng = range(2 ** self.x.shape[0])
+        to_pop = np.random.choice(
+            2 ** self.x.shape[0], 2 ** self.x.shape[0] - self.N, replace=False)
+        self.factors = np.delete(self.factors, to_pop, 0)
+        self.nat_factors = np.copy(self.factors)
+        tones = np.ones((self.factors.shape[0], 1), dtype=int)
+        self.factors = np.hstack((tones, self.factors))
+        self.factors = self.factors * 2 - 1
 
-		dispersion_b = disp_sum / n
-		dispersion_beta = dispersion_b / (m * n)
-		s_beta = math.sqrt(abs(dispersion_beta))
-		beta = {}
-		for x in range(8):
-			beta["beta{0}".format(x)] = 0
-		for i in range(len(x0f)):
-			ctr = 0
-			for key, value in beta.items():
-				beta[key] += (y_ser[i] * list_fact[ctr][i]) / n
-				ctr += 1
+        self.nat_factors = self.nat_factors.T
+        for i in range(self.x.shape[0]):
+            arr = self.nat_factors[i]
+            for j in range(len(arr)):
+                if arr[j] == 1:
+                    arr[j] = self.x[i][1]
+                else:
+                    arr[j] = self.x[i][0]
+            self.nat_factors[i] = arr
+        self.nat_factors = self.nat_factors.T
 
-		beta_list = list(beta.values())
-		t_list = [abs(k) / s_beta for k in beta_list]
+        self.y = np.random.sample((self.N, self.m)) * (self.y_max - self.y_min) + self.y_min
 
-		f3 = f1 * f2
-		d = 0
-		t = student_t(df=f3)
-		print("t = ", t)
-		for i in range(len(t_list)):
-			if student(t_list[i], t):
-				beta_list[i] = 0
-				print("Коефцієнт не є значущим, beta{} = 0".format(i))
-			else:
-				print("Коефіцієнт є значущим, beta{} = {}".format(i, beta_list[i]))
-				d += 1
+    def gen_matrix(self):
+        self.factors = []
+        for i in range(2 ** self.x.shape[0]):
+            self.factors.append(list(map(int, f'{i:0{self.x.shape[0]}b}')))
+        self.factors = np.array(self.factors)
+        to_pop = np.random.choice(
+            2 ** self.x.shape[0], 2 ** self.x.shape[0] - self.N, replace=False)
+        self.factors = np.delete(self.factors, to_pop, 0)
+        self.nat_factors = np.copy(self.factors).T
+        tones = np.ones((self.factors.shape[0], 1), dtype=int)
+        self.factors = np.hstack((tones, self.factors))
+        self.factors[self.factors == 0] = -1
 
-		list_fact[0] = None
-		y_student = [sum([a * b[x_idx] if b else a for a, b in zip(beta_list, list_x)]) for x_idx in range(8)]
+        for i, e in enumerate(self.nat_factors):
+            for j, f in enumerate(e):
+                e[j] = self.x[i][f]
+                e[j] = self.x[i][f]
+            self.nat_factors[i] = e
+        self.nat_factors = self.nat_factors.T
+        self.y = np.random.sample((self.N, self.m)) * \
+                 (self.y_max - self.y_min) + self.y_min
 
-		f4 = n - d
-		dispersion_ad = 0
-		for i in range(len(y_student)):
-			dispersion_ad += ((y_student[i] - y_ser[i]) ** 2) * m / (n - d)
-		fp = dispersion_ad / dispersion_beta
-		ft = fisher_t(dfn=f4, dfd=f3)
-		if fisher(ft, fp):
-			print("Рівняння регресії є адекватним")
-			break
-		else:
-			print("Рівняння регресії не є адекватним")
-			break
-	else:
-		print("Дисперсія не є однорідною")
-		m += 1
+    def def_params(self):
+        self.y_mean = np.apply_along_axis(np.mean, 1, self.y)
+        self.x_mean = np.apply_along_axis(np.mean, 0, self.nat_factors)
+        self.y_mm = np.mean(self.y_mean)
+        self.y_std = np.apply_along_axis(np.std, 1, self.y)
+
+        a1, a2, a3 = 0, 0, 0
+        a11, a22, a33 = 0, 0, 0
+        self.a12, self.a13, self.a23 = 0, 0, 0
+        j = 0
+        for i in self.nat_factors:
+            a1 += i[0] * self.y_mean[j]
+            a2 += i[1] * self.y_mean[j]
+            a3 += i[2] * self.y_mean[j]
+            a11 += i[0] ** 2
+            a22 += i[1] ** 2
+            a33 += i[2] ** 2
+            self.a12 += i[0] * i[1] / self.N
+            self.a13 += i[0] * i[2] / self.N
+            self.a23 += i[1] * i[2] / self.N
+            j += 1
+        self.a1, self.a2, self.a3 = a1 / self.N, a2 / self.N, a3 / self.N
+        self.a11, self.a22, self.a33 = a11 / self.N, a22 / self.N, a33 / self.N
+        self.a21 = self.a12
+        self.a31 = self.a13
+        self.a32 = self.a23
+
+    def gen_b(self):
+        start_matrix = np.array([
+            [1, self.x_mean[0], self.x_mean[1], self.x_mean[2]],
+            [self.x_mean[0], self.a11, self.a12, self.a13],
+            [self.x_mean[1], self.a12, self.a22, self.a32],
+            [self.x_mean[2], self.a13, self.a23, self.a33]
+        ])
+        start_det = np.linalg.det(start_matrix)
+
+        to_replace = [self.y_mm, self.a1, self.a2, self.a3]
+        self.b = []
+        for i in range(4):
+            new_matrix = np.copy(start_matrix)
+            new_matrix = np.array(new_matrix)
+            new_matrix[i] = to_replace
+            self.b.append(np.linalg.det(new_matrix) / start_det)
+
+    def gen_args(self):
+        self.gen_mat()
+        self.def_params()
+        self.gen_b()
+
+    def get_cohren_value(self):
+        size_of_selections = self.N + 1
+        qty_of_selections = self.m - 1
+        significance = self.q
+        partResult1 = significance / (size_of_selections - 1)
+        params = [partResult1, qty_of_selections,
+                  (size_of_selections - 1 - 1) * qty_of_selections]
+        fisher = f.isf(*params)
+        result = fisher / (fisher + (size_of_selections - 1 - 1))
+        return Decimal(result).quantize(Decimal('.0001')).__float__()
+
+    def get_student_value(self):
+        f3 = (self.m - 1) * self.N
+        significance = self.q
+        result = abs(t.ppf(significance / 2, f3))
+        return Decimal(result).quantize(Decimal('.0001')).__float__()
+
+    def get_fisher_value(self):
+        f3 = (self.m - 1) * self.N
+        f4 = self.N - self.d
+        significance = self.q
+        result = abs(f.isf(significance, f4, f3))
+        return Decimal(result).quantize(Decimal('.0001')).__float__()
+
+    def cohren_crit(self):
+        return (np.max(self.y_std) / np.sum(self.y_std)) < self.get_cohren_value()
+
+    def student_crit_1(self):
+        y_std_mean = np.mean(self.y_std)
+        self.S_2b = y_std_mean / (self.N * self.m)
+        t = []
+        for i in range(4):
+            t.append(
+                np.abs(np.sum(self.y_mean * self.factors.T[i]) / self.N) / self.S_2b)
+        self.dev = ""
+        to_save = []
+        t_t = self.get_student_value()
+        for i in range(4):
+            if t[i] > t_t:
+                self.dev = self.dev + f"b{i} * x{i}"
+                added = True
+                to_save.append(1)
+            else:
+                print(f"Коефіцієнт b{i} - незначимий")
+                added = False
+                to_save.append(0)
+            if i != 3 and added:
+                self.dev = self.dev + " + "
+        self.d = to_save.count(1)
+        for i in range(4):
+            if to_save[i] == 0:
+                self.b[i] = 0
+        self.to_compare = [self.b[0] + self.b[1] * i[0] + self.b[2]
+                           * i[1] + self.b[3] * i[2] for i in self.nat_factors]
+
+    def student_crit(self):
+        y_std_mean = np.mean(self.y_std)
+        self.S_2b = y_std_mean / (self.N * self.m)
+        # b = np.mean(self.extended_real.T * self.y_mean, axis=1)
+        b = [0] * self.N
+        for i in range(self.N):
+            for j in range(self.N - 1):
+                b[i] += self.y_mean[i] * self.extended_real[i][j]
+        t = np.array([np.abs(i) / np.sqrt(self.S_2b) for i in b])
+        ret = np.where(t > self.get_student_value())
+        for i in range(self.N):
+            if i not in ret[0]:
+                print(f"Коефіцієнт {self.b[i]} - незначимий")
+                self.b[i] = 0
+        self.d = len(ret[0])
+        self.test = []
+        for i in range(self.N):
+            x = self.b[0]
+            for j in range(1, 7):
+                x += self.b[j] * self.extended_real[i][j]
+            self.test.append(x)
+
+    def fisher_crit(self):
+        if self.d != self.N:
+            S_2_ad = self.m / \
+                     (self.N - self.d) * \
+                     np.sum((np.array(self.y_mean) - np.array(self.to_compare)) ** 2)
+            F_p = S_2_ad / self.S_2b
+            return F_p < self.get_fisher_value()
+        return True
+
+    ###### Lab4 ######
+
+    def define_new_params(self):
+        self.gen_mat()
+        self.y_mean = np.apply_along_axis(np.mean, 1, self.y)
+        self.y_std = np.apply_along_axis(np.std, 1, self.y)
+        self.seq = [[1], [2], [3], [1, 2], [1, 3], [2, 3], [1, 2, 3]]
+        self.extended = []
+        self.extended_real = []
+        self.extended.append([1] * self.N)
+        for i in self.seq:
+            column = [1] * self.N
+            column_real = [1] * self.N
+            for j in i:
+                column *= self.factors.T[j]
+                column_real *= self.nat_factors.T[j - 1]
+            self.extended.append(column)
+            self.extended_real.append(column_real)
+        self.extended_real = np.array(self.extended_real).T
+        self.extended = np.array(self.extended).T
+
+    def generate_new_matrix(self):
+        seq1 = [[], [1], [2], [3], [1, 2], [1, 3], [2, 3], [1, 2, 3]]
+        self.new_matrix = [[copy.copy(seq1[i]) for j in range(self.N)] for i in range(self.N)]
+        self.new_matrix = np.array(self.new_matrix).T
+        for i in range(self.N):
+            for j in range(self.N):
+                self.new_matrix[i][j].extend(seq1[i])
+        self.new_matrix = self.new_matrix.T
+
+    def find_for_norm(self):
+        self.b = [0] * self.N
+        for i in range(self.N):
+            for j in range(self.N):
+                self.b[j] += self.y_mean[i] * self.extended[i][j] / self.N
+        return self.b
+
+    def find_for_real(self):
+        matrix = np.copy(self.new_matrix)
+        self.b = [0] * self.N
+        f = np.copy(self.new_matrix)
+        ext_real = np.copy(self.extended_real)
+        ext_real = np.insert(ext_real, 0, [1] * self.N, axis=1)
+
+        for i in range(self.N):
+            for j in range(self.N):
+                s = [1] * self.N
+                if f[i][j]:
+                    for column in f[i][j]:
+                        s *= self.nat_factors.T[column - 1]
+                    f[i][j] = np.sum(s)
+        f[0][0] = self.N
+        f = f.astype('float64')
+        det = np.linalg.det(f)
+        k = [0 for i in range(self.N)]
+        for i in range(self.N):
+            for j in range(self.N):
+                k[j] += self.y_mean[i] * ext_real[i][j]
+        self.k = k
+
+        for i in range(self.N):
+            m1 = np.copy(f).T
+            m1[i] = k
+            self.b[i] = np.linalg.det(m1) / det
+        return self.b
+
+    def print_data(self):
+        col = []
+        for i in range(len(self.y_mean)):
+            col.append([self.y_mean[i], self.y_std[i]])
+        to_print = np.hstack((self.extended_real, self.y, col))
+        headers = ['x1', 'x2', 'x3', 'x1 * x2', 'x1 * x3', 'x2 * x3', 'x1 * x2 * x3']
+        for i in range(self.m):
+            headers.append(f'y{i + 1}')
+        headers.append('y')
+        headers.append('S(y)')
+        print(tabulate(list(to_print), headers=headers, tablefmt="fancy_grid"))
+
+        b_norm = self.find_for_norm()
+        b_norm = np.round(b_norm, decimals=2)
+        b_norms = np.sign(b_norm)
+        b_norms = np.array(list(map(lambda x: "-" if x < 0 else "+", b_norms)))
+        b_norma = np.abs(b_norm)
+        b_real = self.find_for_real()
+        b_real = np.round(b_real, decimals=2)
+        b_reals = np.sign(b_real)
+        b_reals = np.array(list(map(lambda x: "-" if x < 0 else "+", b_reals)))
+        b_reala = np.abs(b_real)
+
+        print("Рівняння регресії", f"y = {b_reals[0] if b_reals[0] == '-' else ''}{b_reala[0]} "
+                                   f"{b_reals[1]} {b_reala[1]} * x1 "
+                                   f"{b_reals[1]} {b_reala[2]} * x2 "
+                                   f"{b_reals[1]} {b_reala[3]} * x3 "
+                                   f"{b_reals[1]} {b_reala[4]} * x1 * x2 "
+                                   f"{b_reals[1]} {b_reala[5]} * x1 * x3 "
+                                   f"{b_reals[1]} {b_reala[6]} * x2 * x3 "
+                                   f"{b_reals[1]} {b_reala[7]} * x1 * x2 * x3")
+        print("Рівняння регресії для кодованих значень", f"y = {b_norms[0] if b_norms[0] == '-' else ''}{b_norma[0]} "
+                                                         f"{b_norms[1]} {b_norma[1]} * x1 "
+                                                         f"{b_norms[1]} {b_norma[2]} * x2 "
+                                                         f"{b_norms[1]} {b_norma[3]} * x3 "
+                                                         f"{b_norms[1]} {b_norma[4]} * x1 * x2 "
+                                                         f"{b_norms[1]} {b_norma[5]} * x1 * x3 "
+                                                         f"{b_norms[1]} {b_norma[6]} * x2 * x3 "
+                                                         f"{b_norms[1]} {b_norma[7]} * x1 * x2 * x3")
+
+    def model_1(self):
+        self.define_new_params()
+        self.generate_new_matrix()
+        while True:
+            if not self.cohren_crit():
+                print("Дисперсія неоднорідна за критерієм Кохрена")
+                self.define_new_params()
+                self.generate_new_matrix()
+            else:
+                break
+
+        print("Дисперсія однорідна за критерієм Кохрена")
+        self.find_for_norm()
+        self.find_for_real()
+
+        self.student_crit()
+        if self.fisher_crit():
+            print("Рівняння регресії адекватно оригіналу")
+        else:
+            print("Рівняння регресії неадекватно оригіналу")
+            self.model_1()  # Повторення ефекту взаємодії (пункт 2 у блок-схемі)
+
+    def model(self):
+        self.gen_args()
+        while not self.cohren_crit():
+            print(f"Дисперсія неоднорідна за критерієм Кохрена при m = {self.m}, збільшимо m")
+            self.m += 1
+            self.gen_args()
+
+        print("Дисперсія однорідна")
+        self.student_crit_1()
+        print(f"Рівняння регресії - {self.dev}")
+        if self.fisher_crit() == True:
+            print("Рівняння регресії адекватно оригіналу")
+        else:
+            print("Рівняння регресії неадекватно оригіналу")
+            self.model_1()  # Перехід до ефекту взаємодії (пункт 2 у блок-схемі)
+
+        self.print_data()
+
+
+m = Experiment(3, 8, 0.05)
+m.model()
